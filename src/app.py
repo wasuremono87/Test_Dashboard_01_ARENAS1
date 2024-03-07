@@ -110,6 +110,8 @@ with open("../data/stopwords-de.txt", 'r', encoding='utf-8') as file:
 
 
 app = dash.Dash(__name__)
+server = app.server
+
 
 app.layout = html.Div([
     # Container for the entire layout
