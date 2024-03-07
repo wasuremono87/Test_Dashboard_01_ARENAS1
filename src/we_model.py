@@ -70,14 +70,14 @@ class We_model():
         similarity = self.model.similarity(keyword_1, keyword_2)
         return similarity
         
-    def visualize_nearest_neighbours(self, dimensions, keyword_list, topn):
+    def visualize_nearest_neighbours(self, dimensions, keyword_list, topn, stopwords):
         pca = PCA(n_components=2 if dimensions == '2d' else 3)
         fig = go.Figure()
         
         all_words = set(keyword_list)  # Vermeide Duplikate
         all_vectors = []
         labels = []
-    
+        
         # Sammle alle Vektoren und Labels
         for word in keyword_list:
             all_vectors.append(self.model[word])  # Das ausgewählte Wort
@@ -88,6 +88,10 @@ class We_model():
                 labels.append(neighbor)  # Label für den Nachbarn
                 all_words.add(neighbor)
         
+        # Überprüfung, ob all_vectors leer ist
+        if not all_vectors:
+            return go.Figure()  # Gibt eine leere Figur zurück, wenn keine Vektoren vorhanden sind
+            
         # Berechne PCA für alle Vektoren
         all_vectors = pca.fit_transform(np.array(all_vectors))
         word_to_pca = {word: all_vectors[i] for i, word in enumerate(all_words)}
