@@ -116,7 +116,7 @@ server = app.server
 app.layout = html.Div([
     # Container for the entire layout
     html.Div([
-        html.H1("Keywords & n-Grams", style={'textAlign': 'center'}),
+        html.H1("Keywords", style={'textAlign': 'center'}),
         # Left panel for settings - Worthäufigkeiten
         html.Div([
             html.H4("Settings - Keywords"),
@@ -143,30 +143,6 @@ app.layout = html.Div([
             dcc.Graph(id='word-freq-graph'),
         ], style={'width': '80%', 'display': 'inline-block'}),
     ]),
-
-    html.Div([
-        # Left panel for settings - ngrams
-        html.Div([
-            html.H4("Settings - n-Grams"),
-            dcc.Dropdown(id='ngram-type-selector', options=[
-                {'label': 'Bigramme', 'value': 'Texts_Lemmatized_Bigrams'},
-                {'label': 'Trigramme', 'value': 'Texts_Lemmatized_Trigrams'},
-                {'label': 'Bigramme gefiltert', 'value': 'Texts_Lemmatized_Bigrams_Filtered'},
-                {'label': 'Trigramme gefiltert', 'value': 'Texts_Lemmatized_Trigrams_Filtered'}
-            ], multi=True, placeholder="n-Gramm Typ/en"),
-            html.Label('Anzahl der anzuzeigenden n-Gramme:'),
-            dcc.Slider(id='num-ngrams-slider', min=1, max=50, value=10, marks={i: str(i) for i in range(1, 51, 5)}, step=1)
-        ], style={'width': '20%', 'display': 'inline-block', 'verticalAlign': 'top'}),
-
-        # Right panel for Worthäufigkeiten visualizations
-        html.Div([
-            html.H4("Visualizations - n-Grams"),
-            dcc.Graph(id='ngram-freq-graph'),
-            html.H4("n-Gram Network"),
-            dcc.Graph(id='ngram-network-graph')
-        ], style={'width': '80%', 'display': 'inline-block'}),
-    ]),
-
     
     # Divider line
     html.Hr(),
@@ -217,9 +193,12 @@ app.layout = html.Div([
         
         # Right panel for Word Embeddings visualizations
         html.Div([
-            html.H4("Visualizations - Word Embeddings"),
-            html.Div(id='search-results-container') 
-        ], style={'width': '80%', 'display': 'inline-block'}),
+        ], style={'width': '80%', 'display': 'inline-block', 'textAlign': 'center'}),
+    ]),
+    
+    html.Div([
+        html.H4("Results", style={'textAlign': 'center'}),
+        html.Div(id='search-results-container') 
     ]),
     
 ], style={'fontFamily': 'sans-serif'})
@@ -274,168 +253,6 @@ def update_word_graph(selection_mode, selected_texts, selected_pos_tags, num_wor
     fig.update_layout(yaxis={'categoryorder':'total ascending'})  # Häufigstes Wort oben
 
     return fig
-
-@app.callback(
-    Output('ngram-freq-graph', 'figure'),
-    [Input('text-selection-mode', 'value'),
-     Input('global-text-selector', 'value'),
-     Input('ngram-type-selector', 'value'),
-     Input('num-ngrams-slider', 'value')]  # Füge den Slider als Input hinzu
-)
-
-def update_ngram_graph(text_selection_mode, selected_texts, selected_ngram_types, num_ngrams):
-    # Wenn "Alle Texte" ausgewählt ist, überschreibe selected_texts mit allen verfügbaren Texten
-    if text_selection_mode == 'ALL_TEXTS':
-        selected_texts = list(data['Texts_Lemmatized_ALL'].keys())
-    
-    if not selected_texts or not selected_ngram_types:
-        return px.bar()
-    
-    all_ngrams = []
-    # Sammle alle n-Gramme basierend auf den ausgewählten Texten
-    for ngram_type in selected_ngram_types:
-        for text in selected_texts:
-            ngrams = data.get(ngram_type, {}).get(text, [])
-            ngrams_final = []
-            for ngram in ngrams:
-                words = ngram.split(" ")
-                if ngram_type.startswith("Texts_Lemmatized_Bi"):
-                    if words[0] not in set(stopwords) and words[1] not in set(stopwords):
-                        ngrams_final.append(ngram)
-                else:
-                    if words[0] not in set(stopwords) and words[1] not in set(stopwords) and words[2] not in set(stopwords):
-                        ngrams_final.append(ngram)
-            all_ngrams.extend(ngrams_final)
-                    
-    
-    df = pd.DataFrame(all_ngrams, columns=['n-Gramm'])
-    freq = df['n-Gramm'].value_counts().reset_index()
-    freq.columns = ['n-Gramm', 'Häufigkeit']
-    
-    # Beschränke die Anzeige auf die Top-N n-Gramme, basierend auf dem Slider-Wert
-    freq_top_n = freq.head(num_ngrams)
-    
-    # Erstelle das Balkendiagramm, diesmal horizontal für bessere Lesbarkeit
-    fig = px.bar(freq_top_n, x='Häufigkeit', y='n-Gramm', orientation='h', title='Häufigkeit von n-Grammen')
-    fig.update_layout(yaxis={'categoryorder':'total ascending'})  # Häufigstes n-Gramm oben
-    
-    return fig
-
-########### NEU NETZWERKDARSTELLUNG ##############
-# Funktion zur Erstellung des Netzwerkdiagramms
-def create_network_graph(selected_ngram_types, selected_texts, data, num_ngrams):
-    G = nx.Graph()
-    
-    all_ngrams = []
-    # Sammle alle n-Gramme basierend auf den ausgewählten Texten
-    for ngram_type in selected_ngram_types:
-        for text in selected_texts:
-            ngrams = data.get(ngram_type, {}).get(text, [])
-            ngrams_final = []
-            for ngram in ngrams:
-                words = ngram.split(" ")
-                if ngram_type.startswith("Texts_Lemmatized_Bi"):
-                    if words[0] not in set(stopwords) and words[1] not in set(stopwords):
-                        ngrams_final.append(ngram)
-                else:
-                    if words[0] not in set(stopwords) and words[1] not in set(stopwords) and words[2] not in set(stopwords):
-                        ngrams_final.append(ngram)
-            all_ngrams.extend(ngrams_final)
-    
-    df = pd.DataFrame(all_ngrams, columns=['n-Gramm'])
-    freq = df['n-Gramm'].value_counts().reset_index()
-    freq.columns = ['n-Gramm', 'Häufigkeit']
-    
-    # Beschränke die Anzeige auf die Top-N n-Gramme, basierend auf dem Slider-Wert
-    freq_top_n = freq.head(num_ngrams)
-    
-    # Ein Dictionary zur Speicherung der Häufigkeit jeder Kante (später benötigt zur berechnung der kantendicke)
-    edge_counts = defaultdict(int)
-    
-    # Hinzufügen der Kanten für jedes n-Gramm
-    for ngram in freq_top_n["n-Gramm"].tolist():
-        words = ngram.split(" ")  # Splitte jedes n-Gramm in einzelne Wörter
-        # Für jedes n-Gramm, generiere alle möglichen Bigramme (in diesem Fall Verbindungen zwischen aufeinanderfolgenden Wörtern) und füge sie als Kanten hinzu
-        for i in range(len(words)-1):
-            G.add_edge(words[i], words[i+1])
-            # ... und dictionary der edge_counts befüllen
-            edge = (words[i], words[i + 1])
-            edge_counts[edge] += 1
-            
-    # Positionen für die Knoten
-    pos = nx.spring_layout(G)
-
-    # Erstelle die Kanten- und Knoten-Traces
-    edge_x, edge_y = [], []
-    for edge in G.edges():
-        x0, y0 = pos[edge[0]]
-        x1, y1 = pos[edge[1]]
-        edge_x.extend([x0, x1, None])
-        edge_y.extend([y0, y1, None])
-
-    node_x, node_y = [], []
-    for node in G.nodes():
-        x, y = pos[node]
-        node_x.append(x)
-        node_y.append(y)
-
-    ######## Aussehen der Kanten und Knoten
-    ########## KANTEN
-
-    edge_trace = go.Scatter(x=edge_x, y=edge_y, line=dict(width=0.5, color='#888'), mode='lines')
-
-    ########## KNOTEN
-    # Zählen, wie oft jedes Wort vorkommt + Erstellen einer Liste mit der Größe für jeden Knoten basierend auf der Wort-Häufigkeit
-    word_counts = Counter([word for ngram in all_ngrams for word in ngram.split(" ")])
-    node_sizes = [word_counts[node]*10 for node in G.nodes()]  # Multipliziert mit 10 für die Sichtbarkeit
-    node_labels = [f"{node}\n(n={word_counts[node]})" for node in G.nodes()]
-    node_frequencies = [word_counts[node] for node in G.nodes()]
-
-    # Erstellen einer Farbskala von Hellgrün zu Dunkelgrün basierend auf der Häufigkeit
-    # Normalisieren der Frequenzen für die Farbskala
-    normalized_frequencies = np.array(node_frequencies) / max(node_frequencies)
-
-    # Funktion zur linearen Interpolation zwischen Grau und Grün
-    def interpolate_color(freq):
-        # Grau (136, 136, 136) zu Grün (0, 255, 0)
-        start_color = np.array([136, 136, 136])
-        end_color = np.array([0, 255, 0])
-        interpolated_color = start_color + (end_color - start_color) * freq
-        return f"rgb({int(interpolated_color[0])}, {int(interpolated_color[1])}, {int(interpolated_color[2])})"
-
-    colors = [interpolate_color(freq) for freq in normalized_frequencies]
-    
-    node_trace = go.Scatter(
-        x=node_x, 
-        y=node_y, 
-        mode='markers+text',  # Modus auf 'markers+text' setzen, um Text direkt anzuzeigen
-        #marker=dict(size=node_sizes, color=colors, showscale=True), 
-        text=node_labels,  # Knotennamen als Text
-        textposition="top center",  # Position des Textes relativ zu den Markern
-        hoverinfo='text'
-    )
-    
-    return go.Figure(data=[edge_trace, node_trace])
-
-# Callback zur Aktualisierung des Netzwerkdiagramms
-@app.callback(
-    Output('ngram-network-graph', 'figure'),
-    [Input('text-selection-mode', 'value'),
-     Input('global-text-selector', 'value'),
-     Input('ngram-type-selector', 'value'),
-     Input('num-ngrams-slider', 'value')]
-)
-
-def update_network_graph(text_selection_mode, selected_texts, selected_ngram_types, num_ngrams):
-    if text_selection_mode == 'ALL_TEXTS':
-        selected_texts = list(data['Texts_Lemmatized_ALL'].keys())
-        
-    if not selected_texts or not selected_ngram_types:
-        return go.Figure()
-    
-    fig = create_network_graph(selected_ngram_types, selected_texts, data, num_ngrams)
-    return fig
-
 
 #####################################
 #### Hinzufügen von EMBEDDINGS ######
@@ -535,18 +352,36 @@ def update_search_results(n_clicks, keyword, selection_mode, selected_model):
             keywords_f.append(keywords[i])
             right_contexts_f.append(right_contexts[i])
     
+    '''
     results_html = []
     for left_context, keyword, right_context in zip(left_contexts_f, keywords_f, right_contexts_f):
         # Erstelle ein Flex-Container-Div für jedes Ergebnis
         result_html = html.Div([
             html.Div(left_context, style={'flex': 1, 'text-align': 'right', 'margin-right': '10px', 'color': 'grey'}),  # Rechtsbündiger linker Kontext
-            html.Div(keyword, style={'flex': 0, 'font-weight': 'bold'}),  # Zentralisiertes, fettgedrucktes Keyword
+            html.Div(keyword, style={'flex': 0, 'font-weight': 'bold', 'color': 'red'}),  # Zentralisiertes, fettgedrucktes Keyword
             html.Div(right_context, style={'flex': 1, 'text-align': 'left', 'margin-left': '10px', 'color': 'grey'}),  # Linksbündiger rechter Kontext
         ], style={'display': 'flex', 'justify-content': 'center', 'align-items': 'center'})
         
         results_html.append(result_html)
     
     return html.Div(results_html, style={'margin': '20px'})  # Container für alle Ergebnisse
+    '''
+
+    results_html = [html.Tr([
+        html.Td(left_context, style={'text-align': 'right', 'color': 'grey'}), 
+        html.Td(keyword, style={'font-weight': 'bold', 'color': 'red'}),
+        html.Td(right_context, style={'text-align': 'left', 'color': 'grey'})
+    ]) for left_context, keyword, right_context in zip(left_contexts_f, keywords_f, right_contexts_f)]
+    
+    # Wrap the rows in a table structure
+    results_table = html.Table(
+        # Table body
+        [html.Tbody(results_html)],
+        # Table styling
+        style={'width': '100%', 'margin': '20px'}
+    )
+    
+    return results_table
 
 
 ####
